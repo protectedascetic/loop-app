@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Image, StatusBar,
+  ActivityIndicator, StatusBar,
 } from 'react-native';
 import { signInWithGoogle } from '../lib/auth';
+import { C } from '../theme';
 
 interface Props {
   onSignedIn: () => void;
@@ -27,15 +28,17 @@ export default function SignInScreen({ onSignedIn }: Props) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0d0d0d" />
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
 
-      <View style={styles.hero}>
-        <Text style={styles.logo}>🧠</Text>
+      <View style={styles.top}>
+        <View style={styles.iconCircle}>
+          <Text style={styles.iconText}>↺</Text>
+        </View>
         <Text style={styles.title}>Loop</Text>
         <Text style={styles.subtitle}>Capture. Resolve. Stay clear.</Text>
       </View>
 
-      <View style={styles.actions}>
+      <View style={styles.bottom}>
         {error && <Text style={styles.error}>{error}</Text>}
 
         <TouchableOpacity
@@ -45,10 +48,12 @@ export default function SignInScreen({ onSignedIn }: Props) {
           activeOpacity={0.8}
         >
           {loading ? (
-            <ActivityIndicator color="#fff" size="small" />
+            <ActivityIndicator color={C.accent} size="small" />
           ) : (
             <>
-              <Text style={styles.googleIcon}>G</Text>
+              <View style={styles.gIconBox}>
+                <Text style={styles.gIconText}>G</Text>
+              </View>
               <Text style={styles.googleLabel}>Continue with Google</Text>
             </>
           )}
@@ -65,66 +70,89 @@ export default function SignInScreen({ onSignedIn }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0d0d0d',
+    backgroundColor: C.bg,
     justifyContent: 'space-between',
-    paddingVertical: 80,
     paddingHorizontal: 32,
+    paddingBottom: 40,
   },
-  hero: {
+  top: {
     alignItems: 'center',
-    marginTop: 40,
+    marginTop: 60,
   },
-  logo: {
-    fontSize: 72,
-    marginBottom: 16,
+  iconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: C.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconText: {
+    fontSize: 28,
+    color: '#FFFFFF',
   },
   title: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: '#e4e4e4',
-    marginBottom: 8,
+    fontSize: 40,
+    fontWeight: '800',
+    color: C.text,
+    marginTop: 20,
   },
   subtitle: {
     fontSize: 16,
-    color: '#555',
-    letterSpacing: 0.5,
+    color: C.muted,
+    marginTop: 8,
+    letterSpacing: 0.3,
   },
-  actions: {
+  bottom: {
     gap: 12,
   },
+  error: {
+    color: C.red,
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
   googleBtn: {
-    backgroundColor: '#4a9eff',
-    borderRadius: 12,
-    paddingVertical: 14,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 14,
+    paddingVertical: 15,
     paddingHorizontal: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 12,
+    elevation: 2,
+    shadowColor: C.accent,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
   },
   disabled: {
     opacity: 0.6,
   },
-  googleIcon: {
-    fontSize: 18,
+  gIconBox: {
+    width: 28,
+    height: 28,
+    backgroundColor: C.accentLight,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gIconText: {
+    fontSize: 15,
     fontWeight: '800',
-    color: '#fff',
+    color: C.accent,
   },
   googleLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
-  },
-  error: {
-    color: '#f87171',
-    fontSize: 13,
-    textAlign: 'center',
-    marginBottom: 8,
+    color: C.text,
   },
   legal: {
-    fontSize: 12,
-    color: '#333',
+    fontSize: 11,
+    color: C.subtle,
     textAlign: 'center',
-    marginTop: 4,
   },
 });

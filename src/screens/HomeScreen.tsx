@@ -1,6 +1,5 @@
 /**
  * HomeScreen — main Loop UI.
- * TODO: port the web UI's capture + loop list + Brain panel to React Native.
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -13,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getLoops, capture, resolveLoop, snoozeLoop, LoopItem, ApiError } from '../lib/api';
 import { signOut } from '../lib/auth';
 import { NotificationTapPayload } from '../../App';
+import { C, PRI_COLOR, PRI_BG } from '../theme';
 
 interface Props {
   onSignOut: () => void;
@@ -23,10 +23,6 @@ interface Props {
 const TYPE_EMOJI: Record<string, string> = {
   task: '✅', waiting: '⏳', decision: '🤔', idea: '💡',
   concern: '⚠️', opportunity: '🚀', observation: '👁', reflection: '🪞', note: '📝',
-};
-
-const PRI_COLOR: Record<string, string> = {
-  low: '#4ade80', medium: '#fbbf24', high: '#fb923c', critical: '#f87171',
 };
 
 export default function HomeScreen({ onSignOut, notificationTap, onNotificationTapHandled }: Props) {
@@ -114,19 +110,21 @@ export default function HomeScreen({ onSignOut, notificationTap, onNotificationT
     <SafeAreaView style={styles.safe}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.hlogo}>🧠</Text>
-        <Text style={styles.htitle}>Loop</Text>
-        <TouchableOpacity onPress={handleSignOut} style={styles.hbtn}>
-          <Text style={styles.hbtnText}>Sign out</Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>Loop</Text>
+          <Text style={styles.headerCount}>{loops.length} open</Text>
+        </View>
+        <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
+          <Text style={styles.signOutText}>Sign out</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Capture */}
-      <View style={styles.capRow}>
+      {/* Capture card */}
+      <View style={styles.captureCard}>
         <TextInput
-          style={styles.capInput}
+          style={styles.captureInput}
           placeholder="Capture anything…"
-          placeholderTextColor="#555"
+          placeholderTextColor={C.muted}
           value={capText}
           onChangeText={setCapText}
           multiline
@@ -134,15 +132,20 @@ export default function HomeScreen({ onSignOut, notificationTap, onNotificationT
           returnKeyType="send"
           blurOnSubmit
         />
-        <TouchableOpacity
-          style={[styles.capBtn, capturing && styles.disabled]}
-          onPress={handleCapture}
-          disabled={capturing}
-        >
-          {capturing
-            ? <ActivityIndicator color="#fff" size="small" />
-            : <Text style={styles.capBtnText}>→</Text>}
-        </TouchableOpacity>
+        <View style={styles.captureRow}>
+          <Text style={[styles.captureFeedback, capturing ? styles.captureFeedbackActive : null]}>
+            {capturing ? 'Saving…' : ''}
+          </Text>
+          <TouchableOpacity
+            style={[styles.sendBtn, capturing && styles.disabled]}
+            onPress={handleCapture}
+            disabled={capturing}
+          >
+            {capturing
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <Text style={styles.sendBtnText}>→</Text>}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Priority filter chip */}
@@ -158,7 +161,7 @@ export default function HomeScreen({ onSignOut, notificationTap, onNotificationT
       {/* Loop list */}
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator color="#4a9eff" size="large" />
+          <ActivityIndicator color={C.accent} size="large" />
         </View>
       ) : loops.length === 0 ? (
         <View style={styles.center}>
@@ -175,34 +178,43 @@ export default function HomeScreen({ onSignOut, notificationTap, onNotificationT
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => { setRefreshing(true); load(true); }}
-              tintColor="#4a9eff"
+              tintColor={C.accent}
             />
           }
           renderItem={({ item }) => (
             <View style={[styles.card, item.id === highlightedId && styles.cardHighlighted]}>
-              <View style={styles.cardMain}>
-                <Text style={styles.cardEmoji}>{item.emoji}</Text>
-                <View style={styles.cardBody}>
+              <View style={[styles.priBar, { backgroundColor: PRI_COLOR[item.priority] ?? C.amber }]} />
+              <View style={styles.cardContent}>
+                {/* Title row */}
+                <View style={styles.titleRow}>
+                  <Text style={styles.cardEmoji}>{item.emoji}</Text>
                   <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
-                  <View style={styles.cardMeta}>
-                    <View style={[styles.priDot, { backgroundColor: PRI_COLOR[item.priority] ?? '#fbbf24' }]} />
-                    <Text style={styles.metaText}>{item.priority}</Text>
-                    <Text style={styles.metaSep}>·</Text>
-                    <Text style={styles.metaText}>{item.days_old === 0 ? 'today' : `${item.days_old}d`}</Text>
-                  </View>
                 </View>
-                <View style={styles.cardActions}>
-                  <TouchableOpacity onPress={() => handleResolve(item.id)} style={styles.aBtn}>
-                    <Text style={styles.aBtnText}>✓</Text>
+                {/* Meta row */}
+                <View style={styles.metaRow}>
+                  <View style={[styles.priPill, { backgroundColor: PRI_BG[item.priority] ?? C.amberLight }]}>
+                    <Text style={[styles.priPillText, { color: PRI_COLOR[item.priority] ?? C.amber }]}>
+                      {item.priority}
+                    </Text>
+                  </View>
+                  <Text style={styles.metaSep}>·</Text>
+                  <Text style={styles.metaAge}>
+                    {item.days_old === 0 ? 'today' : `${item.days_old}d`}
+                  </Text>
+                </View>
+                {/* Actions row */}
+                <View style={styles.actionsRow}>
+                  <TouchableOpacity onPress={() => handleResolve(item.id)} style={styles.actionBtn}>
+                    <Text style={styles.actionBtnText}>✓</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleSnooze(item.id)} style={styles.aBtn}>
-                    <Text style={styles.aBtnText}>💤</Text>
+                  <TouchableOpacity onPress={() => handleSnooze(item.id)} style={styles.actionBtn}>
+                    <Text style={styles.actionBtnText}>💤</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             </View>
           )}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={styles.listContent}
         />
       )}
     </SafeAreaView>
@@ -210,48 +222,221 @@ export default function HomeScreen({ onSignOut, notificationTap, onNotificationT
 }
 
 const styles = StyleSheet.create({
-  safe:       { flex: 1, backgroundColor: '#0d0d0d' },
-  header:     { flexDirection: 'row', alignItems: 'center', padding: 16,
-                borderBottomWidth: 1, borderBottomColor: '#252525' },
-  hlogo:      { fontSize: 20, marginRight: 8 },
-  htitle:     { fontSize: 18, fontWeight: '700', color: '#e4e4e4', flex: 1 },
-  hbtn:       { borderWidth: 1, borderColor: '#252525', borderRadius: 8,
-                paddingHorizontal: 10, paddingVertical: 4 },
-  hbtnText:   { fontSize: 12, color: '#555' },
+  safe: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
 
-  capRow:     { flexDirection: 'row', padding: 12, gap: 8,
-                borderBottomWidth: 1, borderBottomColor: '#252525' },
-  capInput:   { flex: 1, backgroundColor: '#161616', borderWidth: 1,
-                borderColor: '#252525', borderRadius: 8, color: '#e4e4e4',
-                padding: 10, fontSize: 14, minHeight: 44 },
-  capBtn:     { backgroundColor: '#4a9eff', borderRadius: 8,
-                width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  capBtnText: { fontSize: 20, color: '#fff' },
-  disabled:   { opacity: 0.5 },
+  // Header
+  header: {
+    backgroundColor: C.surface,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: C.text,
+  },
+  headerCount: {
+    fontSize: 12,
+    color: C.muted,
+    marginTop: 1,
+  },
+  signOutBtn: {
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  signOutText: {
+    fontSize: 12,
+    color: C.muted,
+  },
 
-  center:     { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyIcon:  { fontSize: 48, marginBottom: 12 },
-  emptyText:  { fontSize: 14, color: '#555' },
+  // Capture card
+  captureCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    padding: 14,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  captureInput: {
+    fontSize: 15,
+    color: C.text,
+    minHeight: 44,
+  },
+  captureRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  captureFeedback: {
+    fontSize: 12,
+    color: C.green,
+  },
+  captureFeedbackActive: {
+    color: C.green,
+  },
+  sendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: C.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendBtnText: {
+    fontSize: 18,
+    color: '#FFFFFF',
+  },
+  disabled: {
+    opacity: 0.5,
+  },
 
-  filterChip: { margin: 12, marginBottom: 0, alignSelf: 'flex-start',
-                backgroundColor: '#2a1a1a', borderWidth: 1, borderColor: '#f87171',
-                borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 },
-  filterChipText: { color: '#f87171', fontSize: 13 },
+  // Filter chip
+  filterChip: {
+    backgroundColor: C.accentLight,
+    alignSelf: 'flex-start',
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  filterChipText: {
+    color: C.accent,
+    fontSize: 13,
+  },
 
-  list:       { paddingBottom: 48 },
-  card:       { paddingHorizontal: 16, paddingVertical: 12,
-                borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
-  cardHighlighted: { backgroundColor: '#0d1f33', borderLeftWidth: 3, borderLeftColor: '#4a9eff' },
-  cardMain:   { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  cardEmoji:  { fontSize: 18, paddingTop: 2 },
-  cardBody:   { flex: 1 },
-  cardTitle:  { fontSize: 14, fontWeight: '500', color: '#e4e4e4', marginBottom: 4 },
-  cardMeta:   { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  priDot:     { width: 6, height: 6, borderRadius: 3 },
-  metaText:   { fontSize: 12, color: '#555' },
-  metaSep:    { fontSize: 12, color: '#333' },
-  cardActions:{ flexDirection: 'row', gap: 6 },
-  aBtn:       { borderWidth: 1, borderColor: '#252525', borderRadius: 6,
-                padding: 6, width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  aBtnText:   { fontSize: 13 },
+  // Center (loading / empty)
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyIcon: {
+    fontSize: 40,
+    marginBottom: 10,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: C.muted,
+  },
+
+  // List
+  listContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 48,
+  },
+
+  // Card
+  card: {
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    marginBottom: 8,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    borderWidth: 1,
+    borderColor: C.border,
+    flexDirection: 'row',
+  },
+  cardHighlighted: {
+    backgroundColor: C.accentLight,
+  },
+  priBar: {
+    width: 4,
+    alignSelf: 'stretch',
+  },
+  cardContent: {
+    flex: 1,
+    padding: 12,
+  },
+
+  // Title row
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginBottom: 6,
+  },
+  cardEmoji: {
+    fontSize: 18,
+    paddingTop: 1,
+  },
+  cardTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: C.text,
+  },
+
+  // Meta row
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  priPill: {
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  priPillText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  metaSep: {
+    fontSize: 12,
+    color: C.subtle,
+  },
+  metaAge: {
+    fontSize: 12,
+    color: C.muted,
+  },
+
+  // Actions row
+  actionsRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'flex-end',
+  },
+  actionBtn: {
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 6,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionBtnText: {
+    fontSize: 14,
+  },
 });
