@@ -18,7 +18,7 @@ import * as Device from 'expo-device';
 import { configureGoogleSignIn } from './src/lib/auth';
 import { getToken, updateFcmToken } from './src/lib/api';
 import SignInScreen from './src/screens/SignInScreen';
-import HomeScreen from './src/screens/HomeScreen';
+import MainNavigator from './src/screens/MainNavigator';
 
 // Configure how notifications appear when app is foregrounded
 Notifications.setNotificationHandler({
@@ -108,7 +108,7 @@ export default function App() {
 
   return (
     <>
-      <HomeScreen
+      <MainNavigator
         onSignOut={() => setAuthed(false)}
         notificationTap={tapPayload}
         onNotificationTapHandled={() => setTapPayload(null)}

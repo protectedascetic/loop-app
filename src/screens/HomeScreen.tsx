@@ -16,6 +16,7 @@ import { C, PRI_COLOR, PRI_BG } from '../theme';
 
 interface Props {
   onSignOut: () => void;
+  onLoopTap?: (loop: LoopItem) => void;
   notificationTap?: NotificationTapPayload | null;
   onNotificationTapHandled?: () => void;
 }
@@ -25,7 +26,7 @@ const TYPE_EMOJI: Record<string, string> = {
   concern: '⚠️', opportunity: '🚀', observation: '👁', reflection: '🪞', note: '📝',
 };
 
-export default function HomeScreen({ onSignOut, notificationTap, onNotificationTapHandled }: Props) {
+export default function HomeScreen({ onSignOut, onLoopTap, notificationTap, onNotificationTapHandled }: Props) {
   const [loops, setLoops]         = useState<LoopItem[]>([]);
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -182,7 +183,11 @@ export default function HomeScreen({ onSignOut, notificationTap, onNotificationT
             />
           }
           renderItem={({ item }) => (
-            <View style={[styles.card, item.id === highlightedId && styles.cardHighlighted]}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => onLoopTap?.(item)}
+              style={[styles.card, item.id === highlightedId && styles.cardHighlighted]}
+            >
               <View style={[styles.priBar, { backgroundColor: PRI_COLOR[item.priority] ?? C.amber }]} />
               <View style={styles.cardContent}>
                 {/* Title row */}
@@ -212,7 +217,7 @@ export default function HomeScreen({ onSignOut, notificationTap, onNotificationT
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           )}
           contentContainerStyle={styles.listContent}
         />
