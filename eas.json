@@ -14,11 +14,19 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://oneloopbot-production.up.railway.app",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "684012853444-vbht7fiak0ctll98h4g3qc048tn74ule.apps.googleusercontent.com"
       }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://oneloopbot-production.up.railway.app",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "684012853444-vbht7fiak0ctll98h4g3qc048tn74ule.apps.googleusercontent.com"
       }
     }
   },
