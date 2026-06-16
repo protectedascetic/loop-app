@@ -12,9 +12,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getLoops, capture, resolveLoop, snoozeLoop, LoopItem, ApiError } from '../lib/api';
 import { signOut } from '../lib/auth';
+import { NotificationTapPayload } from '../../App';
 
 interface Props {
   onSignOut: () => void;
+  notificationTap?: NotificationTapPayload | null;
+  onNotificationTapHandled?: () => void;
 }
 
 const TYPE_EMOJI: Record<string, string> = {
@@ -26,12 +29,16 @@ const PRI_COLOR: Record<string, string> = {
   low: '#4ade80', medium: '#fbbf24', high: '#fb923c', critical: '#f87171',
 };
 
-export default function HomeScreen({ onSignOut }: Props) {
+export default function HomeScreen({ onSignOut, notificationTap, onNotificationTapHandled }: Props) {
   const [loops, setLoops]         = useState<LoopItem[]>([]);
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [capText, setCapText]     = useState('');
   const [capturing, setCapturing] = useState(false);
+  // null = show all, 'high' = show only high/critical
+  const [priorityFilter, setPriorityFilter] = useState<string | null>(null);
+  // Highlighted loop ID from a notification tap (e.g. snooze wake-up)
+  const [highlightedId, setHighlightedId] = useState<number | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -46,6 +53,26 @@ export default function HomeScreen({ onSignOut }: Props) {
   }, [onSignOut]);
 
   useEffect(() => { load(); }, [load]);
+
+  // React to notification taps from App.tsx
+  useEffect(() => {
+    if (!notificationTap) return;
+    const { loop_id, filter } = notificationTap;
+
+    if (filter === 'high') {
+      setPriorityFilter('high');
+    }
+    if (loop_id) {
+      const id = typeof loop_id === 'string' ? parseInt(loop_id, 10) : loop_id;
+      setHighlightedId(id);
+      // Clear highlight after 4 seconds
+      setTimeout(() => setHighlightedId(null), 4000);
+    }
+
+    // Reload data so newly-woken loops appear
+    load(true);
+    onNotificationTapHandled?.();
+  }, [notificationTap]);
 
   async function handleCapture() {
     const text = capText.trim();
@@ -118,6 +145,16 @@ export default function HomeScreen({ onSignOut }: Props) {
         </TouchableOpacity>
       </View>
 
+      {/* Priority filter chip */}
+      {priorityFilter && (
+        <TouchableOpacity
+          style={styles.filterChip}
+          onPress={() => setPriorityFilter(null)}
+        >
+          <Text style={styles.filterChipText}>🔴 High priority  ✕</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Loop list */}
       {loading ? (
         <View style={styles.center}>
@@ -130,7 +167,9 @@ export default function HomeScreen({ onSignOut }: Props) {
         </View>
       ) : (
         <FlatList
-          data={loops}
+          data={loops.filter(l =>
+            priorityFilter ? (l.priority === 'high' || l.priority === 'critical') : true
+          )}
           keyExtractor={item => String(item.id)}
           refreshControl={
             <RefreshControl
@@ -140,7 +179,7 @@ export default function HomeScreen({ onSignOut }: Props) {
             />
           }
           renderItem={({ item }) => (
-            <View style={styles.card}>
+            <View style={[styles.card, item.id === highlightedId && styles.cardHighlighted]}>
               <View style={styles.cardMain}>
                 <Text style={styles.cardEmoji}>{item.emoji}</Text>
                 <View style={styles.cardBody}>
@@ -194,9 +233,15 @@ const styles = StyleSheet.create({
   emptyIcon:  { fontSize: 48, marginBottom: 12 },
   emptyText:  { fontSize: 14, color: '#555' },
 
+  filterChip: { margin: 12, marginBottom: 0, alignSelf: 'flex-start',
+                backgroundColor: '#2a1a1a', borderWidth: 1, borderColor: '#f87171',
+                borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 },
+  filterChipText: { color: '#f87171', fontSize: 13 },
+
   list:       { paddingBottom: 48 },
   card:       { paddingHorizontal: 16, paddingVertical: 12,
                 borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
+  cardHighlighted: { backgroundColor: '#0d1f33', borderLeftWidth: 3, borderLeftColor: '#4a9eff' },
   cardMain:   { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   cardEmoji:  { fontSize: 18, paddingTop: 2 },
   cardBody:   { flex: 1 },

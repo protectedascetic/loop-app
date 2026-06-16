@@ -9,7 +9,7 @@
  *   4. Build with EAS: `eas build --profile development --platform android`
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
@@ -33,9 +33,18 @@ Notifications.setNotificationHandler({
 
 const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
 
+export type NotificationTapPayload = {
+  screen?: string;
+  loop_id?: number | string;
+  filter?: string;
+};
+
 export default function App() {
   const [checking, setChecking] = useState(true);
   const [authed, setAuthed]     = useState(false);
+  // Stores data from a notification tap so HomeScreen can react
+  const [tapPayload, setTapPayload] = useState<NotificationTapPayload | null>(null);
+  const notifResponseListener = useRef<Notifications.EventSubscription | null>(null);
 
   // Configure Google Sign-In once
   useEffect(() => {
@@ -55,6 +64,29 @@ export default function App() {
   useEffect(() => {
     if (authed) registerForPushNotifications();
   }, [authed]);
+
+  // Handle notification taps (foreground + background/killed)
+  useEffect(() => {
+    // Tapped while app is running in fg or bg
+    notifResponseListener.current = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const data = response.notification.request.content.data as NotificationTapPayload;
+        if (data?.screen) setTapPayload(data);
+      }
+    );
+
+    // App was killed — check if launched from a notification
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        const data = response.notification.request.content.data as NotificationTapPayload;
+        if (data?.screen) setTapPayload(data);
+      }
+    });
+
+    return () => {
+      notifResponseListener.current?.remove();
+    };
+  }, []);
 
   if (checking) {
     return (
@@ -76,7 +108,11 @@ export default function App() {
 
   return (
     <>
-      <HomeScreen onSignOut={() => setAuthed(false)} />
+      <HomeScreen
+        onSignOut={() => setAuthed(false)}
+        notificationTap={tapPayload}
+        onNotificationTapHandled={() => setTapPayload(null)}
+      />
       <StatusBar style="light" />
     </>
   );
