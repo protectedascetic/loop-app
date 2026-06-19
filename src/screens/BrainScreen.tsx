@@ -1,361 +1,169 @@
+/**
+ * BrainScreen — what Loop sees: pattern insight, at-a-glance stats,
+ * attention distribution, and on-demand deeper reflections.
+ */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, ActivityIndicator,
-  StyleSheet, RefreshControl, TouchableOpacity,
+  View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { getBrain, BrainData, ApiError } from '../lib/api';
-import { C } from '../theme';
+import {
+  getBrain, getBrainInsight, brainAvoidance, brainWeek, BrainData, ApiError,
+} from '../lib/api';
+import { C, FONT, TYPE_EMOJI, serifHeading, shadow } from '../theme';
+import { SectionLabel, Bar, Skeletons, EmptyState, FadeIn, toast } from '../ui';
 
-export default function BrainScreen() {
-  const [brain, setBrain]         = useState<BrainData | null>(null);
-  const [loading, setLoading]     = useState(true);
+interface Props { onUnauthorized: () => void }
+
+export default function BrainScreen({ onUnauthorized }: Props) {
+  const [brain, setBrain] = useState<BrainData | null>(null);
+  const [insight, setInsight] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError]         = useState<string | null>(null);
+  const [err, setErr] = useState(false);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    setError(null);
+    setErr(false);
     try {
       setBrain(await getBrain());
+      setInsight(null);
+      getBrainInsight().then(r => setInsight(r.text || '')).catch(() => setInsight(''));
     } catch (e) {
-      if (e instanceof ApiError) {
-        setError('Failed to load brain summary.');
-      }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+      if (e instanceof ApiError && e.isUnauthorized) { onUnauthorized(); return; }
+      setErr(true);
+    } finally { setLoading(false); setRefreshing(false); }
+  }, [onUnauthorized]);
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={styles.loadingHeader}>
-          <Text style={styles.headerTitle}>Brain</Text>
-        </View>
-        <View style={styles.center}>
-          <ActivityIndicator color={C.accent} size="large" />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (error || !brain) {
-    return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={styles.loadingHeader}>
-          <Text style={styles.headerTitle}>Brain</Text>
-        </View>
-        <View style={styles.center}>
-          <Text style={styles.errorText}>{error ?? 'Something went wrong.'}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={() => load()}>
-            <Text style={styles.retryBtnText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const openCount    = brain.total - brain.journal;
-  const staleCount   = brain.stale;
-  const journalCount = brain.journal;
-
-  const STAT_CARDS = [
-    { label: 'Open Loops',      value: openCount    },
-    { label: 'Stale',           value: staleCount   },
-    { label: 'Journal Entries', value: journalCount },
-    { label: 'Total',           value: brain.total  },
-  ];
+  const byType = brain ? Object.entries(brain.by_type).sort((a, b) => b[1] - a[1]) : [];
+  const maxT = Math.max(1, ...byType.map(x => x[1]));
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Brain</Text>
+    <ScrollView
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.accent} />}
+    >
+      <View style={styles.head}>
+        <Text style={serifHeading(24)}>Brain</Text>
+        <Text style={styles.sub}>What Loop sees in your mind right now.</Text>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => { setRefreshing(true); load(true); }}
-            tintColor={C.accent}
-          />
-        }
-      >
-        {/* Narrative block */}
-        {!!brain.narrative && (
-          <View style={styles.narrativeBlock}>
-            <Text style={styles.narrativeText}>{brain.narrative}</Text>
+      {loading ? <View style={{ marginTop: 18 }}><Skeletons n={3} height={84} /></View> :
+        err || !brain ? <EmptyState emoji="⚠" title="Couldn't load." sub="Pull to refresh to retry." /> :
+        <>
+          {/* Insight */}
+          <InsightCard text={insight} />
+
+          {/* At a glance */}
+          <SectionLabel>At a glance</SectionLabel>
+          <View style={styles.statGrid}>
+            <Stat n={brain.total} label="Open" color={C.accent} />
+            <Stat n={brain.stale} label="Aging" color={C.orange} />
+            <Stat n={brain.resolved_week} label="Closed / wk" color={C.green} />
+            <Stat n={brain.journal} label="Journal" color={C.clay} />
           </View>
-        )}
 
-        {/* Stats grid */}
-        <Text style={styles.sectionLabel}>OVERVIEW</Text>
-        <View style={styles.statsGrid}>
-          {STAT_CARDS.map(stat => (
-            <View key={stat.label} style={styles.statCard}>
-              <Text style={styles.statNumber}>{stat.value}</Text>
-              <Text style={styles.statLabel}>{stat.label}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Top attention loads */}
-        {brain.top && brain.top.length > 0 && (
-          <>
-            <Text style={styles.sectionLabel}>TOP ATTENTION LOADS</Text>
-            <View style={styles.attentionList}>
-              {brain.top.map((item, index) => (
-                <View key={index} style={styles.attentionItem}>
-                  <Text style={styles.attentionEmoji}>{item.emoji}</Text>
-                  <Text style={styles.attentionTitle} numberOfLines={1}>{item.title}</Text>
-                  <View style={styles.scoreChip}>
-                    <Text style={styles.scoreChipText}>{Math.round(item.score)}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </>
-        )}
-
-        {/* By type breakdown */}
-        {brain.by_type && Object.keys(brain.by_type).length > 0 && (
-          <>
-            <Text style={styles.sectionLabel}>BY TYPE</Text>
-            <View style={styles.byTypeList}>
-              {Object.entries(brain.by_type)
-                .sort((a, b) => b[1] - a[1])
-                .map(([type, count]) => (
-                  <View key={type} style={styles.byTypeRow}>
-                    <Text style={styles.byTypeLabel}>{type}</Text>
-                    <View style={styles.byTypeBarWrapper}>
-                      <View
-                        style={[
-                          styles.byTypeBar,
-                          {
-                            width: `${Math.min(100, (count / brain.total) * 100)}%`,
-                          },
-                        ]}
-                      />
-                    </View>
-                    <Text style={styles.byTypeCount}>{count}</Text>
+          {/* Distribution */}
+          {byType.length > 0 && (
+            <>
+              <SectionLabel>Where your mind is</SectionLabel>
+              <View style={styles.panel}>
+                {byType.map(([t, n]) => (
+                  <View key={t} style={styles.loadRow}>
+                    <Text style={styles.loadLabel}>{TYPE_EMOJI[t] ?? '📌'} {t}</Text>
+                    <View style={{ flex: 1 }}><Bar pct={(n / maxT) * 100} from={C.accent} to="#8B88EC" height={9} /></View>
+                    <Text style={styles.loadVal}>{n}</Text>
                   </View>
                 ))}
-            </View>
-          </>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+              </View>
+            </>
+          )}
+
+          {/* Deeper reflections */}
+          <SectionLabel>Deeper reflections</SectionLabel>
+          <ToolCard glyph="🔍" glyphBg={C.claySoft} name="What am I avoiding?" desc="A candid look at what you keep postponing." run={brainAvoidance} cta="Reflect" />
+          <ToolCard glyph="🗓" glyphBg={C.accentSoft} name="Weekly review" desc="What you shipped, what to decide, what's next." run={brainWeek} cta="Generate" />
+        </>
+      }
+    </ScrollView>
+  );
+}
+
+function InsightCard({ text }: { text: string | null }) {
+  return (
+    <FadeIn style={styles.insight}>
+      <Text style={styles.insightEyebrow}>PATTERN</Text>
+      {text === null ? <Text style={styles.insightMuted}>Looking for the pattern in your loops…</Text>
+        : text ? <Text style={styles.insightText}>{text}</Text>
+        : <Text style={styles.insightMuted}>Capture a few loops and a pattern will emerge here.</Text>}
+    </FadeIn>
+  );
+}
+
+function Stat({ n, label, color }: { n: number; label: string; color: string }) {
+  return (
+    <View style={styles.stat}>
+      <Text style={[styles.statN, { color }]}>{n}</Text>
+      <Text style={styles.statL}>{label}</Text>
+    </View>
+  );
+}
+
+function ToolCard({ glyph, glyphBg, name, desc, run, cta }: {
+  glyph: string; glyphBg: string; name: string; desc: string; run: () => Promise<{ text: string }>; cta: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [out, setOut] = useState<string | null>(null);
+  async function go() {
+    setBusy(true);
+    try { const r = await run(); setOut(r.text); }
+    catch { toast('Failed', true); }
+    finally { setBusy(false); }
+  }
+  return (
+    <View style={styles.tool}>
+      <View style={styles.toolHead}>
+        <View style={[styles.toolGlyph, { backgroundColor: glyphBg }]}><Text style={{ fontSize: 17 }}>{glyph}</Text></View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.toolName}>{name}</Text>
+          <Text style={styles.toolDesc}>{desc}</Text>
+        </View>
+        <TouchableOpacity style={[styles.toolRun, busy && { opacity: 0.6 }]} onPress={go} disabled={busy}>
+          {busy ? <ActivityIndicator color={C.bg} size="small" /> : <Text style={styles.toolRunText}>{out ? 'Refresh' : cta}</Text>}
+        </TouchableOpacity>
+      </View>
+      {out ? <Text style={styles.toolOut}>{out}</Text> : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: C.bg,
-  },
+  content: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 40 },
+  head: { paddingHorizontal: 2 },
+  sub: { fontSize: 14.5, color: C.muted, marginTop: 7 },
 
-  // Header
-  loadingHeader: {
-    backgroundColor: C.surface,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-  },
-  header: {
-    backgroundColor: C.surface,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: C.text,
-  },
+  insight: { backgroundColor: C.accentTint, borderWidth: 1, borderColor: C.border, borderRadius: 16, padding: 22, marginTop: 18, ...shadow(2) },
+  insightEyebrow: { fontSize: 11.5, fontWeight: '800', letterSpacing: 1.1, color: C.accent, marginBottom: 10 },
+  insightText: { fontFamily: FONT.serif, fontSize: 18, lineHeight: 29, color: C.text },
+  insightMuted: { fontSize: 14, color: C.subtle, fontStyle: 'italic' },
 
-  // Center
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  errorText: {
-    fontSize: 14,
-    color: C.red,
-    textAlign: 'center',
-  },
-  retryBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: C.accentLight,
-    borderRadius: 8,
-  },
-  retryBtnText: {
-    color: C.accent,
-    fontWeight: '600',
-    fontSize: 13,
-  },
+  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  stat: { flexBasis: '47%', flexGrow: 1, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 14, alignItems: 'center', ...shadow(1) },
+  statN: { fontFamily: FONT.serif, fontSize: 26 },
+  statL: { fontSize: 11, color: C.muted, marginTop: 6 },
 
-  // Scroll content
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 48,
-    gap: 4,
-  },
+  panel: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 16, padding: 16, ...shadow(1) },
+  loadRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9 },
+  loadLabel: { width: 118, fontSize: 13, color: C.muted, textTransform: 'capitalize' },
+  loadVal: { width: 22, textAlign: 'right', fontSize: 13, fontWeight: '600', color: C.muted },
 
-  // Narrative
-  narrativeBlock: {
-    backgroundColor: C.accentLight,
-    borderLeftWidth: 3,
-    borderLeftColor: C.accent,
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 16,
-  },
-  narrativeText: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    color: C.muted,
-    lineHeight: 20,
-  },
-
-  // Section label
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: C.subtle,
-    letterSpacing: 1,
-    marginBottom: 8,
-    marginTop: 8,
-  },
-
-  // Stats grid
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 16,
-  },
-  statCard: {
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
-    flex: 1,
-    minWidth: '44%',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
-  },
-  statNumber: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: C.accent,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: C.muted,
-    marginTop: 2,
-    textAlign: 'center',
-  },
-
-  // Attention list
-  attentionList: {
-    backgroundColor: C.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: C.border,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  attentionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-    gap: 10,
-  },
-  attentionEmoji: {
-    fontSize: 18,
-  },
-  attentionTitle: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-    color: C.text,
-  },
-  scoreChip: {
-    backgroundColor: C.accentLight,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  scoreChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: C.accent,
-  },
-
-  // By type
-  byTypeList: {
-    backgroundColor: C.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: C.border,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  byTypeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-    gap: 10,
-  },
-  byTypeLabel: {
-    fontSize: 13,
-    color: C.text,
-    width: 80,
-    textTransform: 'capitalize',
-  },
-  byTypeBarWrapper: {
-    flex: 1,
-    height: 6,
-    backgroundColor: C.surface2,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  byTypeBar: {
-    height: '100%',
-    backgroundColor: C.accent,
-    borderRadius: 3,
-  },
-  byTypeCount: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: C.muted,
-    width: 24,
-    textAlign: 'right',
-  },
+  tool: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 16, padding: 16, marginBottom: 10, ...shadow(1) },
+  toolHead: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  toolGlyph: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  toolName: { fontSize: 14.5, fontWeight: '600', color: C.text },
+  toolDesc: { fontSize: 12.5, color: C.muted, marginTop: 1 },
+  toolRun: { backgroundColor: C.text, borderRadius: 9, paddingHorizontal: 14, paddingVertical: 8, minWidth: 74, alignItems: 'center' },
+  toolRunText: { color: C.bg, fontSize: 12.5, fontWeight: '600' },
+  toolOut: { fontFamily: FONT.serif, fontSize: 15, lineHeight: 24, color: C.text, marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: C.border },
 });

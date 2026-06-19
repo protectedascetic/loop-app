@@ -1,13 +1,21 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+/**
+ * MainNavigator — shared header + 4 spaces (Today / Loops / Journal / Brain),
+ * capture FAB, detail modal, toast host. Custom tab switcher (no nav deps).
+ */
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { C } from '../theme';
-import HomeScreen from './HomeScreen';
+
+import TodayScreen from './TodayScreen';
+import LoopsScreen from './LoopsScreen';
 import JournalScreen from './JournalScreen';
 import BrainScreen from './BrainScreen';
 import LoopDetailModal from './LoopDetailModal';
 import { LoopItem } from '../lib/api';
+import { signOut } from '../lib/auth';
 import { NotificationTapPayload } from '../../App';
+import { C, FONT, shadow } from '../theme';
+import { ToastHost } from '../ui';
 
 interface Props {
   onSignOut: () => void;
@@ -15,93 +23,117 @@ interface Props {
   onNotificationTapHandled?: () => void;
 }
 
-type Tab = 'home' | 'journal' | 'brain';
-
-const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'home',    label: 'Loops',   icon: '⚡' },
-  { id: 'journal', label: 'Journal', icon: '📓' },
-  { id: 'brain',   label: 'Brain',   icon: '🧠' },
+type Tab = 'today' | 'loops' | 'journal' | 'brain';
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'today', label: 'Today' },
+  { id: 'loops', label: 'Loops' },
+  { id: 'journal', label: 'Journal' },
+  { id: 'brain', label: 'Brain' },
 ];
 
 export default function MainNavigator({ onSignOut, notificationTap, onNotificationTapHandled }: Props) {
-  const [activeTab, setActiveTab] = useState<Tab>('home');
-  const [selectedLoop, setSelectedLoop] = useState<LoopItem | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [tab, setTab] = useState<Tab>('today');
+  const [nonce, setNonce] = useState(0);          // bump → remount active screen to reload
+  const [selected, setSelected] = useState<LoopItem | null>(null);
+  const [highlightId, setHighlightId] = useState<number | null>(null);
+  const [focusCapture, setFocusCapture] = useState(false);
 
-  function onLoopResolved() {
-    setSelectedLoop(null);
-    setRefreshKey(k => k + 1);
+  // Notification tap → jump to Loops and highlight the loop
+  useEffect(() => {
+    if (!notificationTap) return;
+    setTab('loops');
+    setNonce(n => n + 1);
+    if (notificationTap.loop_id != null) {
+      const id = typeof notificationTap.loop_id === 'string' ? parseInt(notificationTap.loop_id, 10) : notificationTap.loop_id;
+      setHighlightId(id);
+      setTimeout(() => setHighlightId(null), 3000);
+    }
+    onNotificationTapHandled?.();
+  }, [notificationTap]);
+
+  function go(t: Tab) {
+    setFocusCapture(false);
+    setTab(t);
+    setNonce(n => n + 1);
   }
 
+  function onResolvedFromModal() {
+    setSelected(null);
+    setNonce(n => n + 1);
+  }
+
+  function handleSignOut() {
+    Alert.alert('Sign out', 'Sign out of Loop?', [
+      { text: 'Sign out', style: 'destructive', onPress: async () => { await signOut(); onSignOut(); } },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
+  const screenKey = `${tab}-${nonce}`;
+  const onUnauthorized = onSignOut;
+
   return (
-    <View style={styles.root}>
-      {/* Screen area */}
-      <View style={styles.screen}>
-        {activeTab === 'home' && (
-          <HomeScreen
-            key={refreshKey}
-            onSignOut={onSignOut}
-            onLoopTap={setSelectedLoop}
-            notificationTap={notificationTap}
-            onNotificationTapHandled={onNotificationTapHandled}
-          />
-        )}
-        {activeTab === 'journal' && (
-          <JournalScreen onLoopTap={setSelectedLoop} />
-        )}
-        {activeTab === 'brain' && (
-          <BrainScreen />
-        )}
+    <SafeAreaView style={styles.root} edges={['top']}>
+      {/* Shared header */}
+      <View style={styles.header}>
+        <View style={styles.brand}>
+          <View style={styles.mark}><Text style={styles.markText}>↺</Text></View>
+          <Text style={styles.wordmark}>Loop</Text>
+        </View>
+        <TouchableOpacity onPress={handleSignOut} style={styles.signOut}>
+          <Text style={styles.signOutText}>Sign out</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Bottom tab bar */}
-      <SafeAreaView edges={['bottom']} style={styles.tabBar}>
-        {TABS.map(tab => {
-          const active = tab.id === activeTab;
-          return (
-            <TouchableOpacity
-              key={tab.id}
-              style={styles.tabItem}
-              onPress={() => setActiveTab(tab.id)}
-            >
-              <Text style={styles.tabIcon}>{tab.icon}</Text>
-              <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
-                {tab.label}
-              </Text>
-              {active && <View style={styles.tabIndicator} />}
-            </TouchableOpacity>
-          );
-        })}
-      </SafeAreaView>
+      {/* Tab bar */}
+      <View style={styles.tabs}>
+        {TABS.map(t => (
+          <TouchableOpacity key={t.id} onPress={() => go(t.id)} style={[styles.tab, tab === t.id && styles.tabActive]}>
+            <Text style={[styles.tabText, tab === t.id && styles.tabTextActive]}>{t.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-      {/* Loop detail modal */}
-      {selectedLoop && (
-        <LoopDetailModal
-          loop={selectedLoop}
-          onClose={() => setSelectedLoop(null)}
-          onResolved={onLoopResolved}
-        />
+      {/* Active screen */}
+      <View style={styles.screen}>
+        {tab === 'today' && <TodayScreen key={screenKey} onLoopTap={(id) => { setTab('loops'); setNonce(n => n + 1); setHighlightId(id); setTimeout(() => setHighlightId(null), 3000); }} onUnauthorized={onUnauthorized} focusCapture={focusCapture} />}
+        {tab === 'loops' && <LoopsScreen key={screenKey} onOpenLoop={setSelected} onUnauthorized={onUnauthorized} highlightId={highlightId} />}
+        {tab === 'journal' && <JournalScreen key={screenKey} onUnauthorized={onUnauthorized} />}
+        {tab === 'brain' && <BrainScreen key={screenKey} onUnauthorized={onUnauthorized} />}
+      </View>
+
+      {/* Capture FAB (everywhere except Today, which has the inline capture) */}
+      {tab !== 'today' && (
+        <TouchableOpacity style={styles.fab} activeOpacity={0.85} onPress={() => { setTab('today'); setNonce(n => n + 1); setFocusCapture(true); }}>
+          <Text style={styles.fabText}>+</Text>
+        </TouchableOpacity>
       )}
-    </View>
+
+      {selected && <LoopDetailModal loop={selected} onClose={() => setSelected(null)} onResolved={onResolvedFromModal} />}
+      <ToastHost />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  root:         { flex: 1, backgroundColor: C.bg },
-  screen:       { flex: 1 },
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: C.surface,
-    borderTopWidth: 1,
-    borderTopColor: C.border,
-    paddingTop: 8,
-  },
-  tabItem:      { flex: 1, alignItems: 'center', paddingBottom: 4, position: 'relative' },
-  tabIcon:      { fontSize: 20 },
-  tabLabel:     { fontSize: 10, fontWeight: '600', color: C.muted, marginTop: 2, letterSpacing: 0.3 },
-  tabLabelActive: { color: C.accent },
-  tabIndicator: {
-    position: 'absolute', top: -8, width: 28, height: 3,
-    backgroundColor: C.accent, borderRadius: 2,
-  },
+  root: { flex: 1, backgroundColor: C.bg },
+
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 6, paddingBottom: 8 },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1 },
+  mark: { width: 30, height: 30, borderRadius: 9, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', ...shadow(1) },
+  markText: { color: '#fff', fontSize: 16, fontFamily: FONT.serif },
+  wordmark: { fontSize: 19, fontWeight: '700', color: C.text, letterSpacing: -0.4 },
+  signOut: { borderWidth: 1, borderColor: C.border, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 6 },
+  signOutText: { fontSize: 12.5, color: C.muted, fontWeight: '500' },
+
+  tabs: { flexDirection: 'row', gap: 4, paddingHorizontal: 16, paddingBottom: 8, justifyContent: 'center' },
+  tab: { paddingVertical: 7, paddingHorizontal: 16, borderRadius: 999 },
+  tabActive: { backgroundColor: C.text, ...shadow(1) },
+  tabText: { fontSize: 14, fontWeight: '600', color: C.subtle },
+  tabTextActive: { color: C.bg },
+
+  screen: { flex: 1 },
+
+  fab: { position: 'absolute', right: 18, bottom: 24, width: 54, height: 54, borderRadius: 17, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', ...shadow(3) },
+  fabText: { color: '#fff', fontSize: 28, fontWeight: '300', lineHeight: 30 },
 });

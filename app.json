@@ -5,8 +5,13 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "scheme": "loop",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FAF8F3"
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "in.finbox.loop"
@@ -34,7 +39,7 @@
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
-          "color": "#4a9eff",
+          "color": "#5B57D6",
           "defaultChannel": "default"
         }
       ],

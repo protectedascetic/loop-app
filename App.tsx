@@ -42,7 +42,7 @@ export type NotificationTapPayload = {
 export default function App() {
   const [checking, setChecking] = useState(true);
   const [authed, setAuthed]     = useState(false);
-  // Stores data from a notification tap so HomeScreen can react
+  // Stores data from a notification tap so the navigator can route to it
   const [tapPayload, setTapPayload] = useState<NotificationTapPayload | null>(null);
   const notifResponseListener = useRef<Notifications.EventSubscription | null>(null);
 
@@ -90,9 +90,9 @@ export default function App() {
 
   if (checking) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#0d0d0d', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator color="#4a9eff" size="large" />
-        <StatusBar style="light" />
+      <View style={{ flex: 1, backgroundColor: '#FAF8F3', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator color="#5B57D6" size="large" />
+        <StatusBar style="dark" />
       </View>
     );
   }
@@ -101,7 +101,7 @@ export default function App() {
     return (
       <>
         <SignInScreen onSignedIn={() => setAuthed(true)} />
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
       </>
     );
   }
@@ -113,7 +113,7 @@ export default function App() {
         notificationTap={tapPayload}
         onNotificationTapHandled={() => setTapPayload(null)}
       />
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
     </>
   );
 }

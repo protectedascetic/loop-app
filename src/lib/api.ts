@@ -103,6 +103,8 @@ export interface LoopItem {
   emoji: string;
   is_journal: boolean;
   days_old: number;
+  stale: boolean;
+  attn: number;
   summary: string;
   notes: string[];
 }
@@ -110,6 +112,40 @@ export interface LoopItem {
 export async function getLoops(): Promise<LoopItem[]> {
   const data = await request<{ loops: LoopItem[] }>('GET', '/app/api/loops');
   return data.loops;
+}
+
+// ── Today ───────────────────────────────────────────────────────────────────────
+
+export interface FocusItem {
+  id: number; title: string; type: string; priority: string;
+  days_old: number; stale: boolean; attn: number;
+}
+export interface MomentumItem { title: string; days_ago: number }
+export interface TodayData {
+  greeting: string; name: string;
+  open_count: number; stale_count: number; load: number;
+  focus: FocusItem[]; momentum: MomentumItem[]; streak: number;
+}
+
+export async function getToday(): Promise<TodayData> {
+  return request('GET', '/app/api/today');
+}
+export async function getBriefing(): Promise<{ text: string }> {
+  return request('GET', '/app/api/briefing');
+}
+
+// ── Clusters / Journal ────────────────────────────────────────────────────────
+
+export interface Cluster { name: string; emoji: string; loop_ids: number[] }
+export async function getClusters(): Promise<Cluster[]> {
+  const data = await request<{ clusters: Cluster[] }>('GET', '/app/api/clusters');
+  return data.clusters;
+}
+
+export interface JournalEntry { id: number; type: string; days_old: number; text: string; summary: string }
+export async function getJournal(): Promise<JournalEntry[]> {
+  const data = await request<{ entries: JournalEntry[] }>('GET', '/app/api/journal');
+  return data.entries;
 }
 
 export async function capture(text: string): Promise<{ created: LoopItem[] }> {
@@ -131,14 +167,22 @@ export async function addNote(id: number, text: string) {
 // ── Brain ─────────────────────────────────────────────────────────────────────
 
 export interface BrainData {
-  total: number;
-  journal: number;
+  total: number;          // open action loops
   stale: number;
+  journal: number;
+  resolved_week: number;
   by_type: Record<string, number>;
-  top: Array<{ title: string; type: string; emoji: string; score: number }>;
-  narrative: string;
 }
 
 export async function getBrain(): Promise<BrainData> {
   return request('GET', '/app/api/brain');
+}
+export async function getBrainInsight(): Promise<{ text: string }> {
+  return request('GET', '/app/api/brain/insight');
+}
+export async function brainAvoidance(): Promise<{ text: string }> {
+  return request('POST', '/app/api/brain/avoidance');
+}
+export async function brainWeek(): Promise<{ text: string }> {
+  return request('POST', '/app/api/brain/week');
 }

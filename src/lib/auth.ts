@@ -65,5 +65,6 @@ export async function signOut() {
 // ── Check signed in ───────────────────────────────────────────────────────────
 
 export async function isSignedIn(): Promise<boolean> {
-  return GoogleSignin.isSignedIn();
+  // google-signin v14 removed isSignedIn(); getCurrentUser() is the replacement.
+  return GoogleSignin.getCurrentUser() !== null;
 }
