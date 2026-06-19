@@ -91,3 +91,27 @@ export const serifHeading = (size: number, color = C.text): TextStyle => ({
   fontFamily: FONT.serif, fontSize: size, color, letterSpacing: -0.4,
   ...(Platform.OS === 'android' ? { fontWeight: '600' as const } : {}),
 });
+
+// ── Due dates ──────────────────────────────────────────────────────────────
+export function dueMeta(days: number | null | undefined): { label: string; fg: string; bg: string } | null {
+  if (days === null || days === undefined) return null;
+  const label = days < 0 ? `overdue ${-days}d`
+    : days === 0 ? 'due today'
+    : days === 1 ? 'due tomorrow'
+    : `due in ${days}d`;
+  if (days < 0) return { label, fg: C.red, bg: C.redSoft };
+  if (days <= 1) return { label, fg: '#9A7415', bg: C.amberSoft };
+  return { label, fg: C.muted, bg: C.surface2 };
+}
+
+function localYMD(d: Date): string {
+  const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return z.toISOString().slice(0, 10);
+}
+export function dueDateIn(n: number): string {
+  const d = new Date(); d.setDate(d.getDate() + n); return localYMD(d);
+}
+export function dueWeekend(): string {
+  const d = new Date(); const add = ((6 - d.getDay()) + 7) % 7 || 7;
+  d.setDate(d.getDate() + add); return localYMD(d);
+}

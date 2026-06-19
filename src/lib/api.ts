@@ -105,6 +105,8 @@ export interface LoopItem {
   days_old: number;
   stale: boolean;
   attn: number;
+  due_at: string | null;
+  due_days: number | null;
   summary: string;
   notes: string[];
 }
@@ -119,6 +121,7 @@ export async function getLoops(): Promise<LoopItem[]> {
 export interface FocusItem {
   id: number; title: string; type: string; priority: string;
   days_old: number; stale: boolean; attn: number;
+  due_at: string | null; due_days: number | null;
 }
 export interface MomentumItem { title: string; days_ago: number }
 export interface TodayData {
@@ -160,8 +163,32 @@ export async function snoozeLoop(id: number, days: number) {
   return request('POST', `/app/api/loops/${id}/snooze`, { days });
 }
 
+export async function snoozeUntil(id: number, untilIso: string) {
+  return request('POST', `/app/api/loops/${id}/snooze`, { until: untilIso });
+}
+
+export async function setDue(id: number, due: string | null) {
+  return request('POST', `/app/api/loops/${id}/due`, { due });
+}
+
 export async function addNote(id: number, text: string) {
   return request('POST', `/app/api/loops/${id}/note`, { text });
+}
+
+/** Upload a recorded audio clip → transcribe → capture as loops.
+ *  `file` is a React Native file descriptor: { uri, name, type }. */
+export async function captureVoice(file: { uri: string; name: string; type: string }): Promise<{ text: string; created: LoopItem[] }> {
+  const token = await getToken();
+  const form = new FormData();
+  // RN FormData accepts { uri, name, type } for file parts.
+  form.append('audio', file as unknown as Blob);
+  const res = await fetch(`${BASE_URL}/app/api/capture/voice`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (!res.ok) throw new ApiError(res.status, await res.text());
+  return res.json() as Promise<{ text: string; created: LoopItem[] }>;
 }
 
 // ── Brain ─────────────────────────────────────────────────────────────────────

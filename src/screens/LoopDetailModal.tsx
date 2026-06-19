@@ -7,8 +7,8 @@ import {
   StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LoopItem, resolveLoop, snoozeLoop, addNote } from '../lib/api';
-import { C, FONT, TYPE_EMOJI, PRI_COLOR, serifHeading, shadow } from '../theme';
+import { LoopItem, resolveLoop, snoozeLoop, addNote, setDue } from '../lib/api';
+import { C, FONT, TYPE_EMOJI, PRI_COLOR, serifHeading, shadow, dueDateIn, dueWeekend } from '../theme';
 import { Tag, toast } from '../ui';
 
 interface Props {
@@ -22,6 +22,13 @@ export default function LoopDetailModal({ loop, onClose, onResolved }: Props) {
   const [noteText, setNoteText] = useState('');
   const [addingNote, setAddingNote] = useState(false);
   const [resolving, setResolving] = useState(false);
+  const [due, setDueState] = useState<string | null>(loop.due_at);
+
+  async function applyDue(iso: string | null) {
+    setDueState(iso);
+    try { await setDue(loop.id, iso); toast(iso ? 'Due date set' : 'Due date cleared'); }
+    catch { toast('Failed to set due date', true); }
+  }
 
   async function handleAddNote() {
     const text = noteText.trim();
@@ -87,6 +94,21 @@ export default function LoopDetailModal({ loop, onClose, onResolved }: Props) {
             {!!loop.summary && <Text style={styles.summary}>{loop.summary}</Text>}
 
             <View style={styles.divider} />
+            <Text style={styles.sectionLabel}>DUE DATE{due ? `  ·  ${due}` : ''}</Text>
+            <View style={styles.dueRow}>
+              {[['Today', dueDateIn(0)], ['Tomorrow', dueDateIn(1)], ['Weekend', dueWeekend()], ['Next week', dueDateIn(7)]].map(([label, iso]) => (
+                <TouchableOpacity key={label} style={styles.dueBtn} onPress={() => applyDue(iso)}>
+                  <Text style={styles.dueBtnText}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+              {due && (
+                <TouchableOpacity style={styles.dueBtn} onPress={() => applyDue(null)}>
+                  <Text style={[styles.dueBtnText, { color: C.red }]}>Clear</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={styles.divider} />
             <Text style={styles.sectionLabel}>NOTES</Text>
             {notes.length === 0
               ? <Text style={styles.notesEmpty}>No notes yet. Add a thought, update, or next step.</Text>
@@ -142,6 +164,9 @@ const styles = StyleSheet.create({
 
   divider: { height: 1, backgroundColor: C.border, marginVertical: 18 },
   sectionLabel: { fontSize: 11, fontWeight: '700', color: C.subtle, letterSpacing: 1, marginBottom: 10 },
+  dueRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  dueBtn: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 9, paddingHorizontal: 13, paddingVertical: 8 },
+  dueBtnText: { fontSize: 13, fontWeight: '600', color: C.muted },
   notesEmpty: { fontSize: 13.5, color: C.subtle, fontStyle: 'italic' },
   note: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 11, marginBottom: 6 },
   noteText: { fontSize: 14, color: C.text, lineHeight: 20 },

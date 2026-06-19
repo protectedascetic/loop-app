@@ -10,7 +10,7 @@ import {
   getLoops, getClusters, resolveLoop, snoozeLoop, LoopItem, Cluster, ApiError,
 } from '../lib/api';
 import {
-  C, FONT, TYPE_EMOJI, TYPE_LABEL, TYPE_ORDER, PRI_RANK, PRI_COLOR, serifHeading, shadow,
+  C, FONT, TYPE_EMOJI, TYPE_LABEL, TYPE_ORDER, PRI_RANK, PRI_COLOR, serifHeading, shadow, dueMeta,
 } from '../theme';
 import { SectionLabel, Tag, Skeletons, EmptyState, FadeIn, toast } from '../ui';
 
@@ -127,6 +127,9 @@ function LoopCard({ item, highlight, onTap, onResolve, onSnooze }: {
             <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
             <View style={styles.cardMeta}>
               <Tag type={item.type} />
+              {(() => { const dm = dueMeta(item.due_days); return dm
+                ? <View style={[styles.dueChip, { backgroundColor: dm.bg }]}><Text style={[styles.dueChipText, { color: dm.fg }]}>{dm.label}</Text></View>
+                : null; })()}
               <Text style={[styles.cardAge, item.stale && styles.cardAgeStale]}>
                 {item.days_old === 0 ? 'today' : `${item.days_old}d`}{item.stale ? ' · aging' : ''}
               </Text>
@@ -190,6 +193,8 @@ const styles = StyleSheet.create({
   cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 5 },
   cardAge: { fontSize: 12, color: C.subtle },
   cardAgeStale: { color: C.orange, fontWeight: '600' },
+  dueChip: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1 },
+  dueChipText: { fontSize: 11, fontWeight: '700' },
   cardNotes: { fontSize: 12, color: C.subtle },
   cardActions: { flexDirection: 'row', gap: 5 },
   abtn: { width: 29, height: 29, borderRadius: 8, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },

@@ -109,7 +109,7 @@ export default function MainNavigator({ onSignOut, notificationTap, onNotificati
         </TouchableOpacity>
       )}
 
-      {selected && <LoopDetailModal loop={selected} onClose={() => setSelected(null)} onResolved={onResolvedFromModal} />}
+      {selected && <LoopDetailModal loop={selected} onClose={() => { setSelected(null); setNonce(n => n + 1); }} onResolved={onResolvedFromModal} />}
       <ToastHost />
     </SafeAreaView>
   );

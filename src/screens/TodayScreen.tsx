@@ -10,7 +10,7 @@ import {
 import {
   getToday, getBriefing, capture, TodayData, FocusItem, ApiError,
 } from '../lib/api';
-import { C, FONT, TYPE_EMOJI, serifHeading, shadow } from '../theme';
+import { C, FONT, TYPE_EMOJI, serifHeading, shadow, dueMeta } from '../theme';
 import { SectionLabel, Tag, Bar, LoadMeter, Skeletons, EmptyState, FadeIn, toast } from '../ui';
 
 interface Props {
@@ -172,6 +172,9 @@ function FocusCard({ item, rank, max, onPress }: { item: FocusItem; rank: number
           <View style={styles.focusMeta}>
             <Tag type={item.type} label={`${TYPE_EMOJI[item.type] ?? '📌'} ${item.type}`} />
             <Text style={styles.focusAge}>{item.days_old === 0 ? 'today' : `${item.days_old}d old`}</Text>
+            {(() => { const dm = dueMeta(item.due_days); return dm
+              ? <View style={{ backgroundColor: dm.bg, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1 }}><Text style={{ fontSize: 11, fontWeight: '700', color: dm.fg }}>{dm.label}</Text></View>
+              : null; })()}
             {item.stale && <Text style={styles.focusAging}>· aging</Text>}
           </View>
           <View style={{ marginTop: 10 }}><Bar pct={(item.attn / max) * 100} /></View>
