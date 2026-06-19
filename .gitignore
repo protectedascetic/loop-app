@@ -10,5 +10,6 @@ dist/
 web-build/
 .env.local
 .env
-google-services.json
+# google-services.json is Android client config (not a secret — the API key is
+# restricted by package name + SHA-1). Committed so EAS/Gradle can find it.
 GoogleService-Info.plist
