@@ -8,7 +8,10 @@ import {
   ActivityIndicator, StyleSheet, RefreshControl,
 } from 'react-native';
 import {
-  getToday, getBriefing, capture, TodayData, FocusItem, ApiError,
+  useAudioRecorder, AudioModule, RecordingPresets, setAudioModeAsync,
+} from 'expo-audio';
+import {
+  getToday, getBriefing, capture, captureVoice, TodayData, FocusItem, ApiError,
 } from '../lib/api';
 import { C, FONT, TYPE_EMOJI, serifHeading, shadow, dueMeta } from '../theme';
 import { SectionLabel, Tag, Bar, LoadMeter, Skeletons, EmptyState, FadeIn, toast } from '../ui';
@@ -26,7 +29,10 @@ export default function TodayScreen({ onLoopTap, onUnauthorized, focusCapture }:
   const [refreshing, setRefreshing] = useState(false);
   const [capText, setCapText] = useState('');
   const [capturing, setCapturing] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const inputRef = useRef<TextInput>(null);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -60,6 +66,39 @@ export default function TodayScreen({ onLoopTap, onUnauthorized, focusCapture }:
       toast('Capture failed — try again', true);
     } finally {
       setCapturing(false);
+    }
+  }
+
+  async function toggleRecord() {
+    if (recording) {
+      setRecording(false);
+      try {
+        await recorder.stop();
+        if (recorder.uri) await uploadVoice(recorder.uri);
+      } catch { toast('Recording failed', true); }
+      return;
+    }
+    try {
+      const perm = await AudioModule.requestRecordingPermissionsAsync();
+      if (!perm.granted) { toast('Microphone permission denied', true); return; }
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      setRecording(true);
+    } catch { toast('Couldn’t start recording', true); }
+  }
+
+  async function uploadVoice(uri: string) {
+    setTranscribing(true);
+    try {
+      const r = await captureVoice({ uri, name: 'voice.m4a', type: 'audio/m4a' });
+      const names = (r.created ?? []).map(c => `${c.emoji} ${c.title}`).join(', ');
+      toast(names ? `Captured ${names}`.slice(0, 60) : 'Captured', false);
+      load(true);
+    } catch (e) {
+      toast(e instanceof ApiError ? 'Couldn’t transcribe — try again' : 'Upload failed', true);
+    } finally {
+      setTranscribing(false);
     }
   }
 
@@ -106,10 +145,14 @@ export default function TodayScreen({ onLoopTap, onUnauthorized, focusCapture }:
           blurOnSubmit
           onSubmitEditing={handleCapture}
         />
+        <TouchableOpacity style={[styles.mic, recording && styles.micActive]} onPress={toggleRecord} disabled={transcribing} activeOpacity={0.85}>
+          {transcribing ? <ActivityIndicator color={C.accent} size="small" /> : <Text style={styles.micText}>{recording ? '■' : '🎤'}</Text>}
+        </TouchableOpacity>
         <TouchableOpacity style={[styles.send, capturing && { opacity: 0.5 }]} onPress={handleCapture} disabled={capturing} activeOpacity={0.85}>
           {capturing ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.sendText}>↑</Text>}
         </TouchableOpacity>
       </View>
+      {recording && <Text style={styles.recHint}>Listening… tap ■ to finish</Text>}
 
       {/* Briefing */}
       {data && data.open_count > 0 && (
@@ -202,6 +245,10 @@ const styles = StyleSheet.create({
   captureInput: { flex: 1, fontSize: 15.5, color: C.text, paddingVertical: 12, maxHeight: 140 },
   send: { width: 42, height: 42, borderRadius: 13, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', ...shadow(2) },
   sendText: { color: '#fff', fontSize: 20, fontWeight: '600' },
+  mic: { width: 42, height: 42, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center' },
+  micActive: { backgroundColor: C.redSoft, borderColor: C.red },
+  micText: { fontSize: 18 },
+  recHint: { fontSize: 12.5, color: C.red, marginTop: 8, marginLeft: 4 },
 
   briefing: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 16, padding: 20, paddingLeft: 22, marginTop: 22, overflow: 'hidden', ...shadow(2) },
   briefingBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: C.clay },

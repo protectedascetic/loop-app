@@ -11,11 +11,12 @@ import LoopsScreen from './LoopsScreen';
 import JournalScreen from './JournalScreen';
 import BrainScreen from './BrainScreen';
 import LoopDetailModal from './LoopDetailModal';
-import { LoopItem } from '../lib/api';
+import { useShareIntent } from 'expo-share-intent';
+import { LoopItem, capture } from '../lib/api';
 import { signOut } from '../lib/auth';
 import { NotificationTapPayload } from '../../App';
 import { C, FONT, shadow } from '../theme';
-import { ToastHost } from '../ui';
+import { ToastHost, toast } from '../ui';
 
 interface Props {
   onSignOut: () => void;
@@ -37,6 +38,25 @@ export default function MainNavigator({ onSignOut, notificationTap, onNotificati
   const [selected, setSelected] = useState<LoopItem | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [focusCapture, setFocusCapture] = useState(false);
+
+  // Android/iOS share sheet → capture shared text/links (images: coming soon)
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent({ resetOnBackground: true });
+  useEffect(() => {
+    if (!hasShareIntent) return;
+    (async () => {
+      const text = shareIntent.webUrl || shareIntent.text;
+      if (text) {
+        try {
+          await capture(text);
+          toast('Captured from share ✓');
+          setTab('loops'); setNonce(n => n + 1);
+        } catch { toast('Couldn’t capture the shared item', true); }
+      } else if (shareIntent.files && shareIntent.files.length) {
+        toast('Image capture is coming soon');
+      }
+      resetShareIntent();
+    })();
+  }, [hasShareIntent]);
 
   // Notification tap → jump to Loops and highlight the loop
   useEffect(() => {
