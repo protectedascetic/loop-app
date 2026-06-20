@@ -12,7 +12,7 @@ import JournalScreen from './JournalScreen';
 import BrainScreen from './BrainScreen';
 import LoopDetailModal from './LoopDetailModal';
 import { useShareIntent } from 'expo-share-intent';
-import { LoopItem, capture } from '../lib/api';
+import { LoopItem, capture, captureImage } from '../lib/api';
 import { signOut } from '../lib/auth';
 import { NotificationTapPayload } from '../../App';
 import { C, FONT, shadow } from '../theme';
@@ -45,14 +45,20 @@ export default function MainNavigator({ onSignOut, notificationTap, onNotificati
     if (!hasShareIntent) return;
     (async () => {
       const text = shareIntent.webUrl || shareIntent.text;
+      const img = (shareIntent.files || []).find(f => (f.mimeType || '').startsWith('image/'));
       if (text) {
         try {
           await capture(text);
           toast('Captured from share ✓');
           setTab('loops'); setNonce(n => n + 1);
         } catch { toast('Couldn’t capture the shared item', true); }
-      } else if (shareIntent.files && shareIntent.files.length) {
-        toast('Image capture is coming soon');
+      } else if (img) {
+        try {
+          toast('Reading image…');
+          await captureImage({ uri: img.path, name: img.fileName || 'image.jpg', type: img.mimeType || 'image/jpeg' });
+          toast('Captured from image ✓');
+          setTab('loops'); setNonce(n => n + 1);
+        } catch { toast('Couldn’t capture the image', true); }
       }
       resetShareIntent();
     })();

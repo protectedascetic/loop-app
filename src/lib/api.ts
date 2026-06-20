@@ -107,6 +107,7 @@ export interface LoopItem {
   attn: number;
   due_at: string | null;
   due_days: number | null;
+  image_url?: string | null;
   summary: string;
   notes: string[];
 }
@@ -189,6 +190,21 @@ export async function captureVoice(file: { uri: string; name: string; type: stri
   });
   if (!res.ok) throw new ApiError(res.status, await res.text());
   return res.json() as Promise<{ text: string; created: LoopItem[] }>;
+}
+
+/** Upload an image → Supabase Storage → Claude vision → capture as loops.
+ *  `file` is a React Native file descriptor: { uri, name, type }. */
+export async function captureImage(file: { uri: string; name: string; type: string }): Promise<{ image_url: string; created: LoopItem[] }> {
+  const token = await getToken();
+  const form = new FormData();
+  form.append('image', file as unknown as Blob);
+  const res = await fetch(`${BASE_URL}/app/api/capture/image`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (!res.ok) throw new ApiError(res.status, await res.text());
+  return res.json() as Promise<{ image_url: string; created: LoopItem[] }>;
 }
 
 // ── Brain ─────────────────────────────────────────────────────────────────────
