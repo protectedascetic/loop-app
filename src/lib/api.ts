@@ -172,6 +172,15 @@ export async function setDue(id: number, due: string | null) {
   return request('POST', `/app/api/loops/${id}/due`, { due });
 }
 
+export interface ReadingItem {
+  id: number; url: string; title: string; domain: string;
+  description: string; days_old: number; read: boolean;
+}
+
+export async function getReading(filter: 'unread' | 'read' | 'all' = 'unread'): Promise<{ items: ReadingItem[]; unread_count: number }> {
+  return request('GET', `/app/api/reading?filter=${filter}`);
+}
+
 export async function addNote(id: number, text: string) {
   return request('POST', `/app/api/loops/${id}/note`, { text });
 }
