@@ -55,7 +55,8 @@
         {
           "androidIntentFilters": ["text/*", "image/*"]
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "eas": {

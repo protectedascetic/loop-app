@@ -7,8 +7,9 @@ import {
   StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LoopItem, resolveLoop, snoozeLoop, addNote, setDue } from '../lib/api';
-import { C, FONT, TYPE_EMOJI, PRI_COLOR, serifHeading, shadow, dueDateIn, dueWeekend } from '../theme';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { LoopItem, resolveLoop, snoozeLoop, snoozeUntil, addNote, setDue } from '../lib/api';
+import { C, FONT, TYPE_EMOJI, PRI_COLOR, serifHeading, shadow, dueDateIn, dueWeekend, localYMD } from '../theme';
 import { Tag, toast } from '../ui';
 
 interface Props {
@@ -23,11 +24,25 @@ export default function LoopDetailModal({ loop, onClose, onResolved }: Props) {
   const [addingNote, setAddingNote] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [due, setDueState] = useState<string | null>(loop.due_at);
+  const [pickerMode, setPickerMode] = useState<null | 'due' | 'snooze'>(null);
 
   async function applyDue(iso: string | null) {
     setDueState(iso);
     try { await setDue(loop.id, iso); toast(iso ? 'Due date set' : 'Due date cleared'); }
     catch { toast('Failed to set due date', true); }
+  }
+
+  function onPickDate(event: { type: string }, date?: Date) {
+    const mode = pickerMode;
+    setPickerMode(null);
+    if (event.type !== 'set' || !date) return;
+    const iso = localYMD(date);
+    if (mode === 'due') applyDue(iso);
+    else if (mode === 'snooze') doSnoozeUntil(iso);
+  }
+  async function doSnoozeUntil(ymd: string) {
+    try { await snoozeUntil(loop.id, `${ymd}T09:00:00`); toast(`Snoozed to ${ymd} ☾`); onResolved(); }
+    catch { toast('Failed to snooze', true); }
   }
 
   async function handleAddNote() {
@@ -57,7 +72,7 @@ export default function LoopDetailModal({ loop, onClose, onResolved }: Props) {
       { text: '1 day', onPress: () => doSnooze(1) },
       { text: '3 days', onPress: () => doSnooze(3) },
       { text: '1 week', onPress: () => doSnooze(7) },
-      { text: '2 weeks', onPress: () => doSnooze(14) },
+      { text: 'Pick a date…', onPress: () => setPickerMode('snooze') },
       { text: 'Cancel', style: 'cancel' },
     ]);
   }
@@ -101,12 +116,18 @@ export default function LoopDetailModal({ loop, onClose, onResolved }: Props) {
                   <Text style={styles.dueBtnText}>{label}</Text>
                 </TouchableOpacity>
               ))}
+              <TouchableOpacity style={styles.dueBtn} onPress={() => setPickerMode('due')}>
+                <Text style={styles.dueBtnText}>📅 Pick date</Text>
+              </TouchableOpacity>
               {due && (
                 <TouchableOpacity style={styles.dueBtn} onPress={() => applyDue(null)}>
                   <Text style={[styles.dueBtnText, { color: C.red }]}>Clear</Text>
                 </TouchableOpacity>
               )}
             </View>
+            {pickerMode && (
+              <DateTimePicker value={due ? new Date(due) : new Date()} mode="date" minimumDate={new Date()} onChange={onPickDate} />
+            )}
 
             <View style={styles.divider} />
             <Text style={styles.sectionLabel}>NOTES</Text>

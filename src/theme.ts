@@ -104,7 +104,7 @@ export function dueMeta(days: number | null | undefined): { label: string; fg: s
   return { label, fg: C.muted, bg: C.surface2 };
 }
 
-function localYMD(d: Date): string {
+export function localYMD(d: Date): string {
   const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
   return z.toISOString().slice(0, 10);
 }
