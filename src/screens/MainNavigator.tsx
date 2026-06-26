@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import TodayScreen from './TodayScreen';
 import LoopsScreen from './LoopsScreen';
+import NotesScreen from './NotesScreen';
 import JournalScreen from './JournalScreen';
 import ReadingScreen from './ReadingScreen';
 import BrainScreen from './BrainScreen';
@@ -25,10 +26,11 @@ interface Props {
   onNotificationTapHandled?: () => void;
 }
 
-type Tab = 'today' | 'loops' | 'journal' | 'reading' | 'brain';
+type Tab = 'today' | 'loops' | 'notes' | 'journal' | 'reading' | 'brain';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'today', label: 'Today' },
   { id: 'loops', label: 'Loops' },
+  { id: 'notes', label: 'Notes' },
   { id: 'journal', label: 'Journal' },
   { id: 'reading', label: 'Reading' },
   { id: 'brain', label: 'Brain' },
@@ -126,6 +128,7 @@ export default function MainNavigator({ onSignOut, notificationTap, onNotificati
       <View style={styles.screen}>
         {tab === 'today' && <TodayScreen key={screenKey} onLoopTap={(id) => { setTab('loops'); setNonce(n => n + 1); setHighlightId(id); setTimeout(() => setHighlightId(null), 3000); }} onUnauthorized={onUnauthorized} focusCapture={focusCapture} />}
         {tab === 'loops' && <LoopsScreen key={screenKey} onOpenLoop={setSelected} onUnauthorized={onUnauthorized} highlightId={highlightId} />}
+        {tab === 'notes' && <NotesScreen key={screenKey} onUnauthorized={onUnauthorized} onOpenLoop={(id) => { setTab('loops'); setNonce(n => n + 1); setHighlightId(id); setTimeout(() => setHighlightId(null), 3000); }} />}
         {tab === 'journal' && <JournalScreen key={screenKey} onUnauthorized={onUnauthorized} />}
         {tab === 'reading' && <ReadingScreen key={screenKey} onUnauthorized={onUnauthorized} />}
         {tab === 'brain' && <BrainScreen key={screenKey} onUnauthorized={onUnauthorized} />}

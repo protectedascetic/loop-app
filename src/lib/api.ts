@@ -181,6 +181,31 @@ export async function getReading(filter: 'unread' | 'read' | 'all' = 'unread'): 
   return request('GET', `/app/api/reading?filter=${filter}`);
 }
 
+// ── Notes ──────────────────────────────────────────────────────────────────
+export interface NoteItem {
+  id: number; title: string; snippet: string; days_old: number;
+  summary: string; task_count: number; item_count: number;
+}
+export interface NoteExtractItem { title: string; owner: string; type: string; priority: string }
+export interface NoteLinkedLoop { id: number; title: string; type: string; status: string; emoji: string }
+export interface NoteDetail {
+  id: number; title: string; body: string; created_at: string; summary: string;
+  items: NoteExtractItem[]; entities: { name: string; type: string }[]; linked_loops: NoteLinkedLoop[];
+}
+
+export async function getNotes(): Promise<{ notes: NoteItem[] }> {
+  return request('GET', '/app/api/notes');
+}
+export async function getNote(id: number): Promise<NoteDetail> {
+  return request('GET', `/app/api/notes/${id}`);
+}
+export async function createNote(body: string, title?: string): Promise<{ id: number; summary: string; created_loops: { id: number; title: string; type: string; emoji: string }[] }> {
+  return request('POST', '/app/api/notes', { body, title });
+}
+export async function deleteNote(id: number) {
+  return request('DELETE', `/app/api/notes/${id}`);
+}
+
 export async function addNote(id: number, text: string) {
   return request('POST', `/app/api/loops/${id}/note`, { text });
 }
