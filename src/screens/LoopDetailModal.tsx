@@ -24,7 +24,8 @@ export default function LoopDetailModal({ loop, onClose, onResolved }: Props) {
   const [addingNote, setAddingNote] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [due, setDueState] = useState<string | null>(loop.due_at);
-  const [pickerMode, setPickerMode] = useState<null | 'due' | 'snooze'>(null);
+  const [pickerMode, setPickerMode] = useState<null | 'due' | 'snooze' | 'remind-date' | 'remind-time'>(null);
+  const [remindDate, setRemindDate] = useState<string | null>(null);
 
   async function applyDue(iso: string | null) {
     setDueState(iso);
@@ -34,15 +35,24 @@ export default function LoopDetailModal({ loop, onClose, onResolved }: Props) {
 
   function onPickDate(event: { type: string }, date?: Date) {
     const mode = pickerMode;
-    setPickerMode(null);
-    if (event.type !== 'set' || !date) return;
-    const iso = localYMD(date);
-    if (mode === 'due') applyDue(iso);
-    else if (mode === 'snooze') doSnoozeUntil(iso);
+    if (event.type !== 'set' || !date) { setPickerMode(null); return; }
+    if (mode === 'due') { setPickerMode(null); applyDue(localYMD(date)); }
+    else if (mode === 'snooze') { setPickerMode(null); doSnoozeUntil(localYMD(date)); }
+    else if (mode === 'remind-date') { setRemindDate(localYMD(date)); setPickerMode('remind-time'); }
+    else if (mode === 'remind-time') {
+      setPickerMode(null);
+      const hh = String(date.getHours()).padStart(2, '0');
+      const mm = String(date.getMinutes()).padStart(2, '0');
+      if (remindDate) doRemindAt(`${remindDate}T${hh}:${mm}:00`);
+    }
   }
   async function doSnoozeUntil(ymd: string) {
     try { await snoozeUntil(loop.id, `${ymd}T09:00:00`); toast(`Snoozed to ${ymd} ☾`); onResolved(); }
     catch { toast('Failed to snooze', true); }
+  }
+  async function doRemindAt(iso: string) {
+    try { await snoozeUntil(loop.id, iso); toast('Reminder set ⏰'); onResolved(); }
+    catch { toast('Failed to set reminder', true); }
   }
 
   async function handleAddNote() {
@@ -125,8 +135,19 @@ export default function LoopDetailModal({ loop, onClose, onResolved }: Props) {
                 </TouchableOpacity>
               )}
             </View>
+
+            <Text style={[styles.sectionLabel, { marginTop: 16 }]}>⏰ REMIND ME</Text>
+            <TouchableOpacity style={styles.remindBtn} onPress={() => setPickerMode('remind-date')}>
+              <Text style={styles.remindBtnText}>Pick a date &amp; time</Text>
+            </TouchableOpacity>
+
             {pickerMode && (
-              <DateTimePicker value={due ? new Date(due) : new Date()} mode="date" minimumDate={new Date()} onChange={onPickDate} />
+              <DateTimePicker
+                value={pickerMode === 'remind-time' && remindDate ? new Date(`${remindDate}T09:00:00`) : (due ? new Date(due) : new Date())}
+                mode={pickerMode === 'remind-time' ? 'time' : 'date'}
+                minimumDate={pickerMode === 'remind-time' ? undefined : new Date()}
+                onChange={onPickDate}
+              />
             )}
 
             <View style={styles.divider} />
@@ -188,6 +209,8 @@ const styles = StyleSheet.create({
   dueRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   dueBtn: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 9, paddingHorizontal: 13, paddingVertical: 8 },
   dueBtnText: { fontSize: 13, fontWeight: '600', color: C.muted },
+  remindBtn: { alignSelf: 'flex-start', backgroundColor: C.accentSoft, borderRadius: 9, paddingHorizontal: 14, paddingVertical: 9 },
+  remindBtnText: { fontSize: 13.5, fontWeight: '700', color: C.accentDeep },
   notesEmpty: { fontSize: 13.5, color: C.subtle, fontStyle: 'italic' },
   note: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 11, marginBottom: 6 },
   noteText: { fontSize: 14, color: C.text, lineHeight: 20 },
